@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cognitive IoT Framework</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="dashboard-container">
+        <!-- 1. HEADER -->
+        <header class="header-card">
+            <div class="header-titles">
+                <h1>Cognitive IoT Framework</h1>
+                <p class="subtitle">Context-Aware Autonomous Decision Making</p>
+            </div>
+            <div class="header-status">
+                <div class="badge" id="badge-mqtt">MQTT: Connecting...</div>
+                <div class="badge" id="badge-esp32">ESP32: Stopped</div>
+                <div class="badge" id="badge-scenario">Scenario: random</div>
+                <div class="badge" id="badge-ws" style="background-color: #e74c3c;">Disconnected</div>
+            </div>
+        </header>
+
+        <!-- 2. COGNITIVE CYCLE -->
+        <section class="section-card">
+            <h2>Cognitive Processing Pipeline</h2>
+            <div class="pipeline-flow">
+                <div class="pipeline-step active">SENSE</div>
+                <div class="pipeline-arrow">→</div>
+                <div class="pipeline-step active">UNDERSTAND</div>
+                <div class="pipeline-arrow">→</div>
+                <div class="pipeline-step active">DECIDE</div>
+                <div class="pipeline-arrow">→</div>
+                <div class="pipeline-step active">ACT</div>
+                <div class="pipeline-arrow">→</div>
+                <div class="pipeline-step">LEARN</div>
+            </div>
+        </section>
+
+        <!-- CONTROLS ROW: SCENARIO & INTERVAL -->
+        <div class="grid-row-2">
+            <!-- 8. SCENARIO CONTROL -->
+            <section class="section-card">
+                <h2>Simulation Scenarios</h2>
+                <p class="section-desc">Select operational environment conditions for the Virtual ESP32 sensor simulator.</p>
+                <div class="scenario-controls" id="scenario-buttons-container">
+                    <!-- Populated dynamically via JS -->
+                </div>
+            </section>
+
+            <!-- 9. PUBLISH INTERVAL -->
+            <section class="section-card">
+                <h2>Publishing Interval</h2>
+                <p class="section-desc">Adjust sensor telemetry transmission frequency.</p>
+                <div class="interval-controls">
+                    <button class="btn-interval" data-interval="1">1 sec</button>
+                    <button class="btn-interval" data-interval="2">2 sec</button>
+                    <button class="btn-interval active" data-interval="5">5 sec</button>
+                </div>
+            </section>
+        </div>
+
+        <!-- 3 & 4. LIVE SENSOR DATA & VISUALIZATIONS -->
+        <section class="section-card">
+            <h2>Live Sensor Telemetry</h2>
+            <div class="sensors-grid">
+                <!-- Temperature -->
+                <div class="sensor-card">
+                    <div class="sensor-header">
+                        <span>Temperature</span>
+                        <span id="val-temp" class="sensor-value">-- °C</span>
+                    </div>
+                    <div class="progress-bar-container">
+                        <div id="bar-temp" class="progress-bar" style="width: 0%;"></div>
+                    </div>
+                </div>
+                <!-- Humidity -->
+                <div class="sensor-card">
+                    <div class="sensor-header">
+                        <span>Humidity</span>
+                        <span id="val-humidity" class="sensor-value">-- %</span>
+                    </div>
+                    <div class="progress-bar-container">
+                        <div id="bar-humidity" class="progress-bar" style="width: 0%;"></div>
+                    </div>
+                </div>
+                <!-- Light -->
+                <div class="sensor-card">
+                    <div class="sensor-header">
+                        <span>Light Level</span>
+                        <span id="val-light" class="sensor-value">-- lux</span>
+                    </div>
+                    <div class="progress-bar-container">
+                        <div id="bar-light" class="progress-bar" style="width: 0%;"></div>
+                    </div>
+                </div>
+                <!-- Sound -->
+                <div class="sensor-card">
+                    <div class="sensor-header">
+                        <span>Sound Level</span>
+                        <span id="val-sound" class="sensor-value">--</span>
+                    </div>
+                    <div class="progress-bar-container">
+                        <div id="bar-sound" class="progress-bar" style="width: 0%;"></div>
+                    </div>
+                </div>
+                <!-- CO2 -->
+                <div class="sensor-card">
+                    <div class="sensor-header">
+                        <span>CO₂ Level</span>
+                        <span id="val-co2" class="sensor-value">-- ppm</span>
+                    </div>
+                    <div class="progress-bar-container">
+                        <div id="bar-co2" class="progress-bar" style="width: 0%;"></div>
+                    </div>
+                </div>
+                <!-- Motion -->
+                <div class="sensor-card">
+                    <div class="sensor-header">
+                        <span>Motion / PIR</span>
+                        <span id="val-motion" class="sensor-value">--</span>
+                    </div>
+                    <div class="motion-indicator" id="ind-motion">
+                        <span id="motion-status-text">No Motion</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- COGNITIVE & DECISION & ACTUATORS GRID -->
+        <div class="grid-row-3">
+            <!-- 5. COGNITIVE OUTPUT -->
+            <section class="section-card">
+                <h2>AI Cognitive Understanding</h2>
+                <div class="metric-stack">
+                    <div class="metric-item">
+                        <span class="metric-label">Occupancy State</span>
+                        <span id="cog-state" class="metric-highlight">Waiting...</span>
+                    </div>
+                    <div class="metric-item">
+                        <span class="metric-label">AI Confidence</span>
+                        <span id="cog-confidence" class="metric-highlight">--%</span>
+                    </div>
+                    <div class="metric-item">
+                        <span class="metric-label">Occupancy Class</span>
+                        <span id="cog-class" class="metric-highlight">--</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 6. DECISION LAYER -->
+            <section class="section-card">
+                <h2>Cognitive Decision Layer</h2>
+                <div class="metric-stack">
+                    <div class="metric-item">
+                        <span class="metric-label">Priority Level</span>
+                        <span id="dec-priority" class="priority-badge">NORMAL</span>
+                    </div>
+                    <div class="reasons-container">
+                        <span class="metric-label">Decision Reasons</span>
+                        <ul id="dec-reasons" class="reasons-list">
+                            <li>Waiting for inference...</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 7. VIRTUAL ACTUATORS -->
+            <section class="section-card">
+                <h2>Virtual Actuator State</h2>
+                <div class="actuators-stack">
+                    <div class="actuator-row">
+                        <span>Cooling / Fan</span>
+                        <span id="act-cooling" class="actuator-badge off">OFF</span>
+                    </div>
+                    <div class="actuator-row">
+                        <span>Ventilation</span>
+                        <span id="act-ventilation" class="actuator-badge off">OFF</span>
+                    </div>
+                    <div class="actuator-row">
+                        <span>Lighting</span>
+                        <span id="act-lighting" class="actuator-badge off">OFF</span>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <!-- Error Toast Notification -->
+    <div id="error-toast" class="error-toast hidden"></div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>

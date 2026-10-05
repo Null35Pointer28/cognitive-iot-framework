@@ -1,0 +1,50 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Python tooling
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Local environment / secrets
+.env
+.env.*
+
+# Runtime / generated data
+*.log
+
+# Generated processed data
+data/processed/
+
+# Temporary files
+*.tmp
+*.temp
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Model candidates generated during experimentation
+ai/model/candidate_*.pkl
+
+# Raw datasets
+dataset/
+
+# Experimental model artifacts
+ai/model/candidate_*.pkl
+ai/model/occupancy_model_leakage_aware.pkl
+ai/model/occupancy_model_temporal.pkl
