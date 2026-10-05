@@ -1,4 +1,6 @@
-gunicorn
 fastapi
 uvicorn[standard]
 gunicorn
+paho-mqtt
+numpy
+pandas
