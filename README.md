@@ -12,8 +12,6 @@
 
 ### Sense → Understand → Decide → Act → Learn
 
-[GitHub Repository](https://github.com/Null35Pointer28/cognitive-iot-framework)
-
 </div>
 
 ---
@@ -829,7 +827,5 @@ Potential extensions include:
 ### Cognitive IoT
 
 **Sense the environment. Understand the context. Decide intelligently. Act autonomously. Learn continuously.**
-
-[GitHub Repository](https://github.com/Null35Pointer28/cognitive-iot-framework)
 
 </div>
