@@ -4,3 +4,6 @@ gunicorn
 paho-mqtt
 numpy
 pandas
+joblib
+scikit-learn
+matplotlib
