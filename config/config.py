@@ -3,7 +3,13 @@ Central configuration for the Cognitive IoT project.
 
 This file contains the sensor definitions, realistic value ranges,
 MQTT settings, and general project settings used throughout the application.
+
+MQTT settings can be configured through environment variables so that
+the same code works both locally and in cloud deployment.
 """
+
+import os
+
 
 # ============================================================
 # SENSOR CONFIGURATION
@@ -63,14 +69,41 @@ SENSORS = {
 # ============================================================
 
 MQTT = {
-    "broker": "localhost",
-    "port": 1883,
+    "broker": os.getenv(
+        "MQTT_BROKER",
+        "localhost"
+    ),
+
+    "port": int(
+        os.getenv(
+            "MQTT_PORT",
+            "1883"
+        )
+    ),
+
+    "username": os.getenv(
+        "MQTT_USERNAME",
+        ""
+    ),
+
+    "password": os.getenv(
+        "MQTT_PASSWORD",
+        ""
+    ),
+
+    "tls": os.getenv(
+        "MQTT_TLS",
+        "false"
+    ).lower() == "true",
+
     "topics": {
         "sensors": "cognitive-iot/sensors",
         "actuators": "cognitive-iot/actuators",
         "status": "cognitive-iot/device/status",
     },
+
     "keepalive": 60,
+
     "publish_interval_seconds": 5,
 }
 

@@ -6,6 +6,7 @@ Integrates incoming Virtual ESP32 sensor telemetry with the CognitivePipeline:
 - Passes raw sensor payloads to CognitivePipeline.process()
 - Publishes resulting cognitive actuator commands to cognitive-iot/actuators
 - Maintains thread-safe in-memory state and statistics.
+- Supports both local MQTT and cloud MQTT with authentication/TLS.
 """
 
 import sys
@@ -28,7 +29,12 @@ from config.config import MQTT
 
 class CognitiveMQTTBridge:
     """
-    Bridges MQTT sensor telemetry and actuator commands with the CognitivePipeline.
+    Bridges MQTT sensor telemetry and actuator commands with the
+    CognitivePipeline.
+
+    Supports:
+    - Local MQTT broker without authentication/TLS
+    - Cloud MQTT broker with username/password and TLS
     """
 
     def __init__(
@@ -40,11 +46,23 @@ class CognitiveMQTTBridge:
         self.broker = broker
         self.port = port
 
-        topics = MQTT.get("topics", {})
-        self.sensor_topic = topics.get("sensors", "cognitive-iot/sensors")
-        self.actuator_topic = topics.get("actuators", "cognitive-iot/actuators")
+        self.username = MQTT.get("username", "")
+        self.password = MQTT.get("password", "")
+        self.tls_enabled = MQTT.get("tls", False)
 
-        self.pipeline = CognitivePipeline(record_feedback=record_feedback)
+        topics = MQTT.get("topics", {})
+        self.sensor_topic = topics.get(
+            "sensors",
+            "cognitive-iot/sensors"
+        )
+        self.actuator_topic = topics.get(
+            "actuators",
+            "cognitive-iot/actuators"
+        )
+
+        self.pipeline = CognitivePipeline(
+            record_feedback=record_feedback
+        )
 
         self.connected = False
         self.running = False
@@ -52,10 +70,15 @@ class CognitiveMQTTBridge:
         self.latest_sensor_data = None
         self.latest_cognitive_result = None
         self.latest_actuator_command = None
+
         self.message_count = 0
         self.last_message_timestamp = None
 
         self.lock = threading.Lock()
+
+        # ----------------------------------------------------
+        # MQTT CLIENT
+        # ----------------------------------------------------
 
         try:
             self.client = mqtt.Client(
@@ -64,13 +87,40 @@ class CognitiveMQTTBridge:
         except (AttributeError, TypeError):
             self.client = mqtt.Client()
 
+        # ----------------------------------------------------
+        # MQTT AUTHENTICATION
+        # ----------------------------------------------------
+
+        if self.username:
+            self.client.username_pw_set(
+                username=self.username,
+                password=self.password
+            )
+
+        # ----------------------------------------------------
+        # MQTT TLS
+        # ----------------------------------------------------
+
+        if self.tls_enabled:
+            self.client.tls_set()
+
+        # ----------------------------------------------------
+        # CALLBACKS
+        # ----------------------------------------------------
+
         self.client.on_connect = self._on_connect
         self.client.on_message = self._on_message
         self.client.on_disconnect = self._on_disconnect
 
+    # ========================================================
+    # MQTT CALLBACKS
+    # ========================================================
+
     def _on_connect(self, client, userdata, flags, *args):
         rc = args[0] if args else 0
+
         is_success = False
+
         try:
             if hasattr(rc, "is_failure"):
                 is_success = not rc.is_failure
@@ -93,58 +143,121 @@ class CognitiveMQTTBridge:
             if message is None or message.payload is None:
                 return
 
-            payload_str = message.payload.decode("utf-8", errors="replace")
+            payload_str = message.payload.decode(
+                "utf-8",
+                errors="replace"
+            )
+
             sensor_data = json.loads(payload_str)
 
             if not isinstance(sensor_data, dict):
                 return
 
-            # Process through CognitivePipeline
+            # ------------------------------------------------
+            # COGNITIVE PIPELINE
+            # ------------------------------------------------
+
             result = self.pipeline.process(sensor_data)
 
-            prediction = result.get("prediction", {})
-            decision = result.get("decision", {})
+            prediction = result.get(
+                "prediction",
+                {}
+            )
+
+            decision = result.get(
+                "decision",
+                {}
+            )
+
+            # ------------------------------------------------
+            # ACTUATOR COMMAND
+            # ------------------------------------------------
 
             actuator_command = {
-                "cooling": decision.get("cooling", "OFF"),
-                "ventilation": decision.get("ventilation", "OFF"),
-                "lighting": decision.get("lighting", "OFF"),
-                "occupancy_state": prediction.get("occupancy_state", "Unknown"),
-                "confidence": prediction.get("confidence", 0.0),
-                "priority": decision.get("priority", "NORMAL"),
+                "cooling": decision.get(
+                    "cooling",
+                    "OFF"
+                ),
+                "ventilation": decision.get(
+                    "ventilation",
+                    "OFF"
+                ),
+                "lighting": decision.get(
+                    "lighting",
+                    "OFF"
+                ),
+                "occupancy_state": prediction.get(
+                    "occupancy_state",
+                    "Unknown"
+                ),
+                "confidence": prediction.get(
+                    "confidence",
+                    0.0
+                ),
+                "priority": decision.get(
+                    "priority",
+                    "NORMAL"
+                ),
             }
 
-            payload = json.dumps(actuator_command)
-            self.client.publish(self.actuator_topic, payload)
+            payload = json.dumps(
+                actuator_command
+            )
+
+            self.client.publish(
+                self.actuator_topic,
+                payload
+            )
+
+            # ------------------------------------------------
+            # UPDATE STATE
+            # ------------------------------------------------
 
             with self.lock:
                 self.latest_sensor_data = sensor_data
                 self.latest_cognitive_result = result
                 self.latest_actuator_command = actuator_command
+
                 self.message_count += 1
-                self.last_message_timestamp = datetime.now().isoformat(timespec="seconds")
+
+                self.last_message_timestamp = (
+                    datetime.now().isoformat(
+                        timespec="seconds"
+                    )
+                )
 
         except Exception:
-            # Gracefully handle malformed messages without crashing
+            # Malformed MQTT messages must never crash
+            # the bridge.
             pass
 
     def _on_disconnect(self, *args, **kwargs):
         with self.lock:
             self.connected = False
 
+    # ========================================================
+    # START / STOP
+    # ========================================================
+
     def start(self):
         with self.lock:
             if self.running:
                 return
+
             self.running = True
 
         try:
             self.client.connect(
                 self.broker,
                 self.port,
-                keepalive=MQTT.get("keepalive", 60),
+                keepalive=MQTT.get(
+                    "keepalive",
+                    60
+                ),
             )
+
             self.client.loop_start()
+
         except Exception:
             with self.lock:
                 self.connected = False
@@ -167,75 +280,171 @@ class CognitiveMQTTBridge:
         with self.lock:
             self.connected = False
 
+    # ========================================================
+    # STATE ACCESS
+    # ========================================================
+
     def get_status(self) -> dict:
         with self.lock:
             return {
                 "connected": self.connected,
                 "running": self.running,
                 "message_count": self.message_count,
-                "last_message_timestamp": self.last_message_timestamp,
+                "last_message_timestamp": (
+                    self.last_message_timestamp
+                ),
             }
 
     def get_latest_sensor_data(self) -> dict:
         with self.lock:
             if self.latest_sensor_data is None:
                 return {}
-            return dict(self.latest_sensor_data)
+
+            return dict(
+                self.latest_sensor_data
+            )
 
     def get_latest_cognitive_result(self) -> dict:
         with self.lock:
             if self.latest_cognitive_result is None:
                 return {}
-            return dict(self.latest_cognitive_result)
+
+            return dict(
+                self.latest_cognitive_result
+            )
 
     def get_latest_actuator_command(self) -> dict:
         with self.lock:
             if self.latest_actuator_command is None:
                 return {}
-            return dict(self.latest_actuator_command)
 
+            return dict(
+                self.latest_actuator_command
+            )
+
+
+# ============================================================
+# STANDALONE INTEGRATION TEST
+# ============================================================
 
 if __name__ == "__main__":
+
     print("========================================")
     print("     COGNITIVE MQTT BRIDGE INTEGRATION TEST")
     print("========================================")
 
     from simulation.virtual_esp32 import VirtualESP32
 
-    # 1. Start Bridge
-    bridge = CognitiveMQTTBridge(record_feedback=False)
+    # --------------------------------------------------------
+    # 1. START BRIDGE
+    # --------------------------------------------------------
+
+    bridge = CognitiveMQTTBridge(
+        record_feedback=False
+    )
+
     bridge.start()
-    time.sleep(1.0)
-    print(f"Bridge status after start: {bridge.get_status()}")
 
-    # 2. Start Virtual ESP32
-    esp32 = VirtualESP32(scenario="high_occupancy", publish_interval_seconds=1)
+    time.sleep(1.0)
+
+    print(
+        f"Bridge status after start: "
+        f"{bridge.get_status()}"
+    )
+
+    # --------------------------------------------------------
+    # 2. START VIRTUAL ESP32
+    # --------------------------------------------------------
+
+    esp32 = VirtualESP32(
+        scenario="high_occupancy",
+        publish_interval_seconds=1
+    )
+
     esp32.start()
+
     time.sleep(1.0)
 
-    # Test scenarios: empty, high_occupancy, critical_co2
-    scenarios_to_test = ["empty", "high_occupancy", "critical_co2"]
+    # --------------------------------------------------------
+    # 3. TEST SCENARIOS
+    # --------------------------------------------------------
+
+    scenarios_to_test = [
+        "empty",
+        "high_occupancy",
+        "critical_co2",
+    ]
 
     for scn in scenarios_to_test:
-        print(f"\n--- Testing Scenario: {scn} ---")
+
+        print(
+            f"\n--- Testing Scenario: {scn} ---"
+        )
+
         esp32.set_scenario(scn)
-        time.sleep(2.5)  # allow messages to flow through MQTT -> Bridge -> Pipeline -> MQTT -> ESP32
+
+        time.sleep(2.5)
 
         status = bridge.get_status()
-        sensor_data = bridge.get_latest_sensor_data()
-        cognitive_result = bridge.get_latest_cognitive_result()
-        actuator_cmd = bridge.get_latest_actuator_command()
-        esp32_state = esp32.get_actuator_state()
 
-        print(f"Messages processed so far : {status['message_count']}")
-        print(f"Latest Sensor Readings  : {sensor_data}")
-        print(f"AI Prediction           : {cognitive_result.get('prediction')}")
-        print(f"Cognitive Decision      : {cognitive_result.get('decision')}")
-        print(f"Published Actuator Cmd  : {actuator_cmd}")
-        print(f"Virtual ESP32 Actuators : {esp32_state}")
+        sensor_data = (
+            bridge.get_latest_sensor_data()
+        )
 
-    # 3. Clean Shutdown
-    print("\nShutting down Virtual ESP32 and Bridge cleanly...")
+        cognitive_result = (
+            bridge.get_latest_cognitive_result()
+        )
+
+        actuator_cmd = (
+            bridge.get_latest_actuator_command()
+        )
+
+        esp32_state = (
+            esp32.get_actuator_state()
+        )
+
+        print(
+            f"Messages processed so far : "
+            f"{status['message_count']}"
+        )
+
+        print(
+            f"Latest Sensor Readings  : "
+            f"{sensor_data}"
+        )
+
+        print(
+            f"AI Prediction           : "
+            f"{cognitive_result.get('prediction')}"
+        )
+
+        print(
+            f"Cognitive Decision      : "
+            f"{cognitive_result.get('decision')}"
+        )
+
+        print(
+            f"Published Actuator Cmd  : "
+            f"{actuator_cmd}"
+        )
+
+        print(
+            f"Virtual ESP32 Actuators : "
+            f"{esp32_state}"
+        )
+
+    # --------------------------------------------------------
+    # 4. CLEAN SHUTDOWN
+    # --------------------------------------------------------
+
+    print(
+        "\nShutting down Virtual ESP32 "
+        "and Bridge cleanly..."
+    )
+
     esp32.stop()
     bridge.stop()
-    print("Integration test completed successfully.")
+
+    print(
+        "Integration test completed successfully."
+    )
