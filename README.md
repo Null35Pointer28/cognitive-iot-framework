@@ -812,16 +812,6 @@ Potential extensions include:
 
 ---
 
-# Team
-
-**Project:** Cognitive IoT Framework for Context-Aware Autonomous Decision Making
-
-**Program:** B.Tech CSE Internet of Things & Intelligent Systems
-
-**Institution:** Manipal University Jaipur
-
----
-
 <div align="center">
 
 ### Cognitive IoT
